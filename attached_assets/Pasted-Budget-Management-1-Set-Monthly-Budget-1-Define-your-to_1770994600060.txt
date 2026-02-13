@@ -1,0 +1,78 @@
+Budget Management:
+
+1. **Set Monthly Budget**
+    1. Define your total spending limit for the month.
+2. **Update Monthly Budget**
+    1. Adjust your monthly budget as needed.
+3. **Track Budget Change History**
+    1. Every budget update is recorded with the new value and date.
+4. **Set Daily Budget Target**
+    1. Break your monthly budget into daily limits to control spending.
+5. **Recurring Expenses**
+    1. Automatically add repeating costs like rent, subscriptions, or tuition.
+6. **Savings Goal Tracker**
+    1. Set a monthly savings target and track progress.
+
+Expense Tracking:
+
+1. **Add New Expense**
+    1. Enter expense details like name, amount, and optional notes.
+2. **Edit or Delete Expense**
+    1. Make corrections or remove an expense anytime.
+3. **Tag Expenses (Tooltips)**
+    1. Use smart tags like `vegetable`, `oil`, `chicken` for quick sorting.
+4. **Attach Receipt Image**
+    1. Upload or snap a photo of receipts to keep records.
+5. **Voice Input**
+    1. Add expenses using voice for fast entry.
+6. **Shopping List Integration**
+    1. Create and compare your to-buy list with actual expenses.
+    
+
+Daily & Monthly Insights
+
+1. **Daily Expense Summary**
+    1. See how much you've spent today at a glance.
+2. **Monthly Expense Overview**
+    1. Tracks your total spending for the current month.
+3. **Auto Budget & Cost Updates** ✅
+    1. Every new expense instantly:
+4. Updates today’s **total cost**
+5. Adds to the **monthly spending**
+    1. This keeps both daily and monthly views always up-to-date.
+6. **Category-wise Breakdown**
+    1. Shows which categories (Food, Transport, etc.) take the most money.
+7. **Top 3 Spending Categories**
+    1. Highlights your most expensive habits monthly.
+8. **No-Spend Days Tracker**
+    1. Tracks days with no spending to encourage savings.
+9. **Calendar View of Expenses**
+    1. Visualize your daily expenses on a monthly calendar.
+10. **Auto Daily + Monthly Sync**
+    1. Expenses update both daily and monthly totals automatically.
+
+Notifications & Alerts
+
+1. **Daily Budget Alert**
+    1. Receive a notification when you're close to or over your daily spending limit.
+
+Activity & History
+
+1. **Activity Log**
+    1. Automatically logs all actions: added, edited, deleted expenses, or budget updates.
+2. **Search & Filter**
+    1. Find any past expense by tag, keyword, or date.
+
+User Experience & Utility
+
+1. **Dark Mode Only Interface**
+    1. Modern, minimal dark UI for visual comfort.
+2. **App Lock (PIN or Biometric)**
+    1. Secure your financial data with a password, fingerprint, or face ID.
+3. **Export to Excel or PDF**
+    1. Download your full expense report anytime.
+4. **Auto Backup & Restore**
+    1. Keeps your data safe and restorable when switching devices or reinstalling.
+5. **Offline Mode with Auto-Sync**✅
+    1. Works offline and syncs changes when internet returns.
+6. Profile customization
