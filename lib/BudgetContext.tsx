@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import type { Expense, SavingsGoal, SavedCard, ActivityItem, UserProfile } from './types';
 import * as Storage from './storage';
-import { useAuth } from './AuthContext';
 
 interface BudgetContextValue {
   expenses: Expense[];
@@ -26,43 +25,30 @@ interface BudgetContextValue {
   monthTotal: number;
   remainingBudget: number;
   remainingDailyBudget: number;
+  exportAllData: () => Promise<string>;
+  importAllData: (jsonString: string) => Promise<void>;
 }
 
 const BudgetContext = createContext<BudgetContextValue | null>(null);
 
 export function BudgetProvider({ children }: { children: ReactNode }) {
-  const { user, isAuthenticated } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [profile, setProfile] = useState<UserProfile>({
-    name: 'User',
-    currency: '৳',
-    monthlyBudget: 0,
-    dailyBudgetTarget: 0,
-  });
+  const [profile, setProfile] = useState<UserProfile>({ name: 'User', currency: '৳', monthlyBudget: 0, dailyBudgetTarget: 0 });
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [savedCards, setSavedCards] = useState<SavedCard[]>([]);
   const [activityLog, setActivityLog] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (user) {
-      setProfile({
-        name: user.displayName || user.username,
-        currency: user.currency || '৳',
-        monthlyBudget: user.monthlyBudget || 0,
-        dailyBudgetTarget: user.dailyBudgetTarget || 0,
-      });
-    }
-  }, [user]);
-
   const refreshAll = useCallback(async () => {
-    const [exp, goals, cards, log] = await Promise.all([
+    const [exp, prof, goals, cards, log] = await Promise.all([
       Storage.getExpenses(),
+      Storage.getUserProfile(),
       Storage.getSavingsGoals(),
       Storage.getSavedCards(),
       Storage.getActivityLog(),
     ]);
     setExpenses(exp);
+    setProfile(prof);
     setSavingsGoals(goals);
     setSavedCards(cards);
     setActivityLog(log);
@@ -86,23 +72,11 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     await refreshAll();
   }, [refreshAll]);
 
-  const { updateProfile: updateAuthProfile } = useAuth();
-
   const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
-    if (isAuthenticated) {
-      try {
-        await updateAuthProfile({
-          displayName: updates.name,
-          currency: updates.currency,
-          monthlyBudget: updates.monthlyBudget,
-          dailyBudgetTarget: updates.dailyBudgetTarget,
-        });
-      } catch (e) {}
-    }
     await Storage.updateUserProfile(updates);
     const updated = await Storage.getUserProfile();
     setProfile(updated);
-  }, [isAuthenticated, updateAuthProfile]);
+  }, []);
 
   const addSavingsGoal = useCallback(async (goal: Omit<SavingsGoal, 'id' | 'createdAt'>) => {
     await Storage.addSavingsGoal(goal);
@@ -129,6 +103,15 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     await refreshAll();
   }, [refreshAll]);
 
+  const exportAllData = useCallback(async () => {
+    return Storage.exportAllData();
+  }, []);
+
+  const importAllData = useCallback(async (jsonString: string) => {
+    await Storage.importAllData(jsonString);
+    await refreshAll();
+  }, [refreshAll]);
+
   const today = new Date().toISOString().split('T')[0];
   const currentMonth = new Date().toISOString().slice(0, 7);
 
@@ -143,12 +126,12 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
     expenses, profile, savingsGoals, savedCards, activityLog, isLoading,
     refreshAll, addExpense, updateExpense, deleteExpense, updateProfile,
     addSavingsGoal, updateSavingsGoal, deleteSavingsGoal,
-    addSavedCard, deleteSavedCard,
+    addSavedCard, deleteSavedCard, exportAllData, importAllData,
     todayExpenses, monthExpenses, todayTotal, monthTotal, remainingBudget, remainingDailyBudget,
   }), [expenses, profile, savingsGoals, savedCards, activityLog, isLoading,
     refreshAll, addExpense, updateExpense, deleteExpense, updateProfile,
     addSavingsGoal, updateSavingsGoal, deleteSavingsGoal,
-    addSavedCard, deleteSavedCard,
+    addSavedCard, deleteSavedCard, exportAllData, importAllData,
     todayExpenses, monthExpenses, todayTotal, monthTotal, remainingBudget, remainingDailyBudget]);
 
   return <BudgetContext.Provider value={value}>{children}</BudgetContext.Provider>;

@@ -1,23 +1,25 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, TextInput, Platform, Alert } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Pressable, TextInput, Platform, Alert, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import * as FileSystem from 'expo-file-system';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Sharing from 'expo-sharing';
 import Colors from '@/constants/colors';
 import { useBudget } from '@/lib/BudgetContext';
-import { useAuth } from '@/lib/AuthContext';
 import { formatCurrency, formatDate, formatTime } from '@/lib/helpers';
 import { CURRENCY_OPTIONS } from '@/lib/types';
 
-function SettingsRow({ icon, label, value, onPress, danger }: { icon: string; label: string; value?: string; onPress?: () => void; danger?: boolean }) {
+function SettingsRow({ icon, label, value, onPress, color }: { icon: string; label: string; value?: string; onPress?: () => void; color?: string }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.settingsRow, pressed && onPress && { backgroundColor: Colors.dark.surfaceElevated }]}
       onPress={onPress}
     >
       <View style={styles.settingsLeft}>
-        <Ionicons name={icon as any} size={20} color={danger ? Colors.dark.danger : Colors.dark.textSecondary} />
-        <Text style={[styles.settingsLabel, danger && { color: Colors.dark.danger }]}>{label}</Text>
+        <Ionicons name={icon as any} size={20} color={color || Colors.dark.textSecondary} />
+        <Text style={[styles.settingsLabel, color ? { color } : null]}>{label}</Text>
       </View>
       <View style={styles.settingsRight}>
         {value && <Text style={styles.settingsValue}>{value}</Text>}
@@ -60,17 +62,12 @@ function ActivityLogItem({ item, currency }: { item: any; currency: string }) {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, updateProfile, activityLog, savingsGoals, expenses } = useBudget();
-  const { user, logout, changePassword } = useAuth();
+  const { profile, updateProfile, activityLog, savingsGoals, expenses, exportAllData, importAllData } = useBudget();
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(profile.name);
   const [showActivity, setShowActivity] = useState(false);
-  const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [currentPwd, setCurrentPwd] = useState('');
-  const [newPwd, setNewPwd] = useState('');
-  const [pwdError, setPwdError] = useState('');
-  const [pwdSuccess, setPwdSuccess] = useState('');
-  const [pwdLoading, setPwdLoading] = useState(false);
+  const [exportStatus, setExportStatus] = useState('');
+  const [importStatus, setImportStatus] = useState('');
   const webTopInset = Platform.OS === 'web' ? 67 : 0;
 
   const handleSaveName = async () => {
@@ -86,42 +83,87 @@ export default function ProfileScreen() {
     updateProfile({ currency: CURRENCY_OPTIONS[nextIndex] });
   };
 
-  const handleLogout = async () => {
+  const handleExport = async () => {
     try {
-      await logout();
-    } catch (e) {}
+      setExportStatus('Preparing...');
+      const jsonData = await exportAllData();
+      const dateStr = new Date().toISOString().split('T')[0];
+      const fileName = `expense-daddy-backup-${dateStr}.json`;
+
+      if (Platform.OS === 'web') {
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        setExportStatus('Downloaded!');
+      } else {
+        const filePath = `${FileSystem.documentDirectory}${fileName}`;
+        await FileSystem.writeAsStringAsync(filePath, jsonData);
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(filePath, {
+            mimeType: 'application/json',
+            dialogTitle: 'Save your backup',
+            UTI: 'public.json',
+          });
+        }
+        setExportStatus('Exported!');
+      }
+      setTimeout(() => setExportStatus(''), 2000);
+    } catch (e) {
+      setExportStatus('Export failed');
+      setTimeout(() => setExportStatus(''), 2000);
+    }
   };
 
-  const handlePasswordChange = async () => {
-    if (!currentPwd || !newPwd) {
-      setPwdError('Please fill in both fields');
-      return;
-    }
-    if (newPwd.length < 4) {
-      setPwdError('New password must be at least 4 characters');
-      return;
-    }
-    setPwdError('');
-    setPwdSuccess('');
-    setPwdLoading(true);
+  const handleImport = async () => {
     try {
-      await changePassword(currentPwd, newPwd);
-      setPwdSuccess('Password updated successfully');
-      setCurrentPwd('');
-      setNewPwd('');
-      setTimeout(() => {
-        setShowPasswordChange(false);
-        setPwdSuccess('');
-      }, 1500);
-    } catch (err: any) {
-      const msg = err?.message || '';
-      if (msg.includes('401')) {
-        setPwdError('Current password is incorrect');
+      setImportStatus('');
+
+      if (Platform.OS === 'web') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = async (e: any) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            try {
+              const text = event.target?.result as string;
+              await importAllData(text);
+              setImportStatus('Data restored!');
+              setTimeout(() => setImportStatus(''), 2000);
+            } catch (err) {
+              setImportStatus('Invalid backup file');
+              setTimeout(() => setImportStatus(''), 2000);
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
       } else {
-        setPwdError('Password change failed');
+        const result = await DocumentPicker.getDocumentAsync({
+          type: 'application/json',
+          copyToCacheDirectory: true,
+        });
+
+        if (result.canceled || !result.assets || result.assets.length === 0) {
+          return;
+        }
+
+        const fileUri = result.assets[0].uri;
+        const content = await FileSystem.readAsStringAsync(fileUri);
+        await importAllData(content);
+        setImportStatus('Data restored!');
+        setTimeout(() => setImportStatus(''), 2000);
       }
-    } finally {
-      setPwdLoading(false);
+    } catch (e) {
+      setImportStatus('Import failed');
+      setTimeout(() => setImportStatus(''), 2000);
     }
   };
 
@@ -157,9 +199,6 @@ export default function ProfileScreen() {
             <Pressable onPress={() => { setNameInput(profile.name); setEditingName(true); }}>
               <Text style={styles.profileName}>{profile.name}</Text>
             </Pressable>
-          )}
-          {user && (
-            <Text style={styles.usernameLabel}>@{user.username}</Text>
           )}
           <View style={styles.profileStats}>
             <View style={styles.profileStat}>
@@ -210,65 +249,25 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+          <Text style={styles.sectionTitle}>Data</Text>
           <View style={styles.settingsGroup}>
             <SettingsRow
-              icon="key-outline"
-              label="Change Password"
-              onPress={() => setShowPasswordChange(!showPasswordChange)}
+              icon="download-outline"
+              label={exportStatus || "Export All Data"}
+              onPress={handleExport}
+              color={exportStatus === 'Downloaded!' || exportStatus === 'Exported!' ? Colors.dark.success : undefined}
             />
             <SettingsRow
-              icon="log-out-outline"
-              label="Sign Out"
-              onPress={handleLogout}
-              danger
+              icon="push-outline"
+              label={importStatus || "Import Data"}
+              onPress={handleImport}
+              color={importStatus === 'Data restored!' ? Colors.dark.success : importStatus && importStatus !== '' ? Colors.dark.danger : undefined}
             />
           </View>
+          <Text style={styles.dataHint}>
+            Export your data as a backup file. If you reinstall the app, use Import to restore everything.
+          </Text>
         </View>
-
-        {showPasswordChange && (
-          <View style={styles.passwordSection}>
-            {pwdError ? (
-              <View style={styles.pwdErrorBox}>
-                <Ionicons name="alert-circle" size={14} color={Colors.dark.danger} />
-                <Text style={styles.pwdErrorText}>{pwdError}</Text>
-              </View>
-            ) : null}
-            {pwdSuccess ? (
-              <View style={styles.pwdSuccessBox}>
-                <Ionicons name="checkmark-circle" size={14} color={Colors.dark.success} />
-                <Text style={styles.pwdSuccessText}>{pwdSuccess}</Text>
-              </View>
-            ) : null}
-            <View style={styles.pwdInputContainer}>
-              <TextInput
-                style={styles.pwdInput}
-                placeholder="Current password"
-                placeholderTextColor={Colors.dark.textTertiary}
-                value={currentPwd}
-                onChangeText={setCurrentPwd}
-                secureTextEntry
-              />
-            </View>
-            <View style={styles.pwdInputContainer}>
-              <TextInput
-                style={styles.pwdInput}
-                placeholder="New password"
-                placeholderTextColor={Colors.dark.textTertiary}
-                value={newPwd}
-                onChangeText={setNewPwd}
-                secureTextEntry
-              />
-            </View>
-            <Pressable
-              style={({ pressed }) => [styles.pwdButton, pressed && { opacity: 0.85 }]}
-              onPress={handlePasswordChange}
-              disabled={pwdLoading}
-            >
-              <Text style={styles.pwdButtonText}>{pwdLoading ? 'Updating...' : 'Update Password'}</Text>
-            </Pressable>
-          </View>
-        )}
 
         <View style={styles.section}>
           <Pressable onPress={() => setShowActivity(!showActivity)} style={styles.sectionHeader}>
@@ -331,12 +330,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     fontSize: 22,
     color: Colors.dark.text,
-    marginBottom: 4,
-  },
-  usernameLabel: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    color: Colors.dark.textTertiary,
     marginBottom: 16,
   },
   nameEditRow: {
@@ -432,66 +425,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.dark.textSecondary,
   },
-  passwordSection: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  pwdInputContainer: {
-    backgroundColor: Colors.dark.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    height: 48,
-  },
-  pwdInput: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.dark.text,
-    height: 48,
-    paddingHorizontal: 14,
-  },
-  pwdButton: {
-    backgroundColor: Colors.dark.surfaceElevated,
-    borderRadius: 14,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  pwdButtonText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-    color: Colors.dark.text,
-  },
-  pwdErrorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.dark.danger + '15',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  pwdErrorText: {
+  dataHint: {
     fontFamily: 'Inter_400Regular',
     fontSize: 12,
-    color: Colors.dark.danger,
-  },
-  pwdSuccessBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: Colors.dark.success + '15',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  pwdSuccessText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: Colors.dark.success,
+    color: Colors.dark.textTertiary,
+    marginTop: 10,
+    lineHeight: 18,
   },
   activityItem: {
     flexDirection: 'row',

@@ -171,3 +171,50 @@ export async function getShoppingList(): Promise<string[]> {
 export async function setShoppingList(list: string[]): Promise<void> {
   await setItem(KEYS.SHOPPING_LIST, list);
 }
+
+export async function exportAllData(): Promise<string> {
+  const [expenses, profile, savingsGoals, savedCards, activityLog, budgetHistory, shoppingList] = await Promise.all([
+    getExpenses(),
+    getUserProfile(),
+    getSavingsGoals(),
+    getSavedCards(),
+    getActivityLog(),
+    getBudgetHistory(),
+    getShoppingList(),
+  ]);
+
+  const data = {
+    version: 1,
+    exportDate: new Date().toISOString(),
+    appName: 'ExpenseDaddy',
+    expenses,
+    profile,
+    savingsGoals,
+    savedCards,
+    activityLog,
+    budgetHistory,
+    shoppingList,
+  };
+
+  return JSON.stringify(data, null, 2);
+}
+
+export async function importAllData(jsonString: string): Promise<void> {
+  const data = JSON.parse(jsonString);
+
+  if (data.appName !== 'ExpenseDaddy') {
+    throw new Error('Invalid backup file');
+  }
+
+  const promises: Promise<void>[] = [];
+
+  if (data.expenses) promises.push(setItem(KEYS.EXPENSES, data.expenses));
+  if (data.profile) promises.push(setItem(KEYS.USER_PROFILE, data.profile));
+  if (data.savingsGoals) promises.push(setItem(KEYS.SAVINGS_GOALS, data.savingsGoals));
+  if (data.savedCards) promises.push(setItem(KEYS.SAVED_CARDS, data.savedCards));
+  if (data.activityLog) promises.push(setItem(KEYS.ACTIVITY_LOG, data.activityLog));
+  if (data.budgetHistory) promises.push(setItem(KEYS.BUDGET_HISTORY, data.budgetHistory));
+  if (data.shoppingList) promises.push(setItem(KEYS.SHOPPING_LIST, data.shoppingList));
+
+  await Promise.all(promises);
+}
