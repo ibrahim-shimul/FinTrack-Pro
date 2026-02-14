@@ -52,6 +52,10 @@ export function getCategoryColor(category: string): string {
     'Education': '#F7DC6F',
     'Subscriptions': '#BB8FCE',
     'Other': '#AEB6BF',
+    'Rent': '#DDA0DD',
+    'Insurance': '#4ECDC4',
+    'Internet': '#45B7D1',
+    'Phone': '#96CEB4',
   };
   return map[category] || '#AEB6BF';
 }
@@ -68,6 +72,10 @@ export function getCategoryIcon(category: string): string {
     'Education': 'book-outline',
     'Subscriptions': 'card-outline',
     'Other': 'ellipsis-horizontal-outline',
+    'Rent': 'home-outline',
+    'Insurance': 'shield-outline',
+    'Internet': 'wifi-outline',
+    'Phone': 'call-outline',
   };
   return map[category] || 'ellipsis-horizontal-outline';
 }

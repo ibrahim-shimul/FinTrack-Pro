@@ -7,9 +7,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
 import { useBudget } from '@/lib/BudgetContext';
 import { formatCurrency, getCategoryColor, getCategoryIcon, formatDate, formatTime } from '@/lib/helpers';
-import { CATEGORIES } from '@/lib/types';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 function BudgetRing({ spent, budget, currency }: { spent: number; budget: number; currency: string }) {
   const percentage = budget > 0 ? Math.min((spent / budget) * 100, 100) : 0;
@@ -63,7 +60,11 @@ function RecentTransaction({ name, category, amount, date, currency }: { name: s
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, todayTotal, monthTotal, remainingBudget, remainingDailyBudget, expenses, monthExpenses, isLoading } = useBudget();
+  const {
+    profile, todayTotal, monthTotal, remainingBudget, remainingDailyBudget,
+    expenses, monthExpenses, isLoading,
+    monthFixedTotal, totalLoansOutstanding, loans,
+  } = useBudget();
   const webTopInset = Platform.OS === 'web' ? 67 : 0;
 
   const topCategories = React.useMemo(() => {
@@ -77,13 +78,11 @@ export default function HomeScreen() {
       .map(([name, amount]) => ({ name, amount }));
   }, [monthExpenses]);
 
-  const recentExpenses = expenses.slice(0, 5);
+  const dailyExpenses = React.useMemo(() => expenses.filter(e => (e.expenseType || 'daily') === 'daily'), [expenses]);
+  const recentExpenses = dailyExpenses.slice(0, 5);
 
   const noSpendDays = React.useMemo(() => {
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
     const today = now.getDate();
     const expenseDates = new Set(monthExpenses.map(e => new Date(e.date).getDate()));
     let count = 0;
@@ -155,6 +154,29 @@ export default function HomeScreen() {
             color={Colors.dark.success}
           />
         </View>
+
+        {(monthFixedTotal > 0 || totalLoansOutstanding > 0) && (
+          <View style={styles.extraStatsRow}>
+            {monthFixedTotal > 0 && (
+              <View style={styles.extraStatCard}>
+                <View style={[styles.statIconContainer, { backgroundColor: '#BB8FCE15' }]}>
+                  <Ionicons name="calendar-outline" size={18} color="#BB8FCE" />
+                </View>
+                <Text style={styles.statLabel}>Fixed (Month)</Text>
+                <Text style={styles.statValue}>{formatCurrency(monthFixedTotal, profile.currency)}</Text>
+              </View>
+            )}
+            {totalLoansOutstanding > 0 && (
+              <View style={styles.extraStatCard}>
+                <View style={[styles.statIconContainer, { backgroundColor: '#FF6B6B15' }]}>
+                  <Ionicons name="wallet-outline" size={18} color="#FF6B6B" />
+                </View>
+                <Text style={styles.statLabel}>Loans Due</Text>
+                <Text style={styles.statValue}>{formatCurrency(totalLoansOutstanding, profile.currency)}</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {profile.dailyBudgetTarget > 0 && (
           <View style={styles.dailyBudgetBar}>
@@ -328,6 +350,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginTop: 16,
     gap: 10,
+  },
+  extraStatsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginTop: 10,
+    gap: 10,
+  },
+  extraStatCard: {
+    flex: 1,
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
   },
   statCard: {
     flex: 1,

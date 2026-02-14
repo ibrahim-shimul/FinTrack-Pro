@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Expense, BudgetHistory, SavingsGoal, SavedCard, ActivityItem, UserProfile } from './types';
+import type { Expense, BudgetHistory, SavingsGoal, SavedCard, ActivityItem, UserProfile, LoanEntry, FixedExpense } from './types';
 
 const KEYS = {
   EXPENSES: '@budgetflow_expenses',
@@ -9,6 +9,8 @@ const KEYS = {
   ACTIVITY_LOG: '@budgetflow_activity_log',
   USER_PROFILE: '@budgetflow_user_profile',
   SHOPPING_LIST: '@budgetflow_shopping_list',
+  LOANS: '@budgetflow_loans',
+  FIXED_EXPENSES: '@budgetflow_fixed_expenses',
 };
 
 async function getItem<T>(key: string, fallback: T): Promise<T> {
@@ -25,7 +27,8 @@ function generateId(): string {
 }
 
 export async function getExpenses(): Promise<Expense[]> {
-  return getItem<Expense[]>(KEYS.EXPENSES, []);
+  const expenses = await getItem<Expense[]>(KEYS.EXPENSES, []);
+  return expenses.map(e => ({ ...e, expenseType: e.expenseType || 'daily' }));
 }
 
 export async function addExpense(expense: Omit<Expense, 'id' | 'createdAt'>): Promise<Expense> {
@@ -71,6 +74,62 @@ export async function deleteExpense(id: string): Promise<void> {
       amount: expense.amount,
     });
   }
+}
+
+export async function getLoans(): Promise<LoanEntry[]> {
+  return getItem<LoanEntry[]>(KEYS.LOANS, []);
+}
+
+export async function addLoan(loan: Omit<LoanEntry, 'id' | 'createdAt' | 'isPaid'>): Promise<LoanEntry> {
+  const loans = await getLoans();
+  const newLoan: LoanEntry = {
+    ...loan,
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+    isPaid: false,
+  };
+  loans.unshift(newLoan);
+  await setItem(KEYS.LOANS, loans);
+  await addActivity({ type: 'loan_added', description: `Added loan: ${loan.name}`, amount: loan.amount });
+  return newLoan;
+}
+
+export async function updateLoan(id: string, updates: Partial<LoanEntry>): Promise<void> {
+  const loans = await getLoans();
+  const index = loans.findIndex(l => l.id === id);
+  if (index !== -1) {
+    loans[index] = { ...loans[index], ...updates };
+    await setItem(KEYS.LOANS, loans);
+    await addActivity({ type: 'loan_updated', description: `Updated loan: ${loans[index].name}`, amount: loans[index].amount });
+  }
+}
+
+export async function deleteLoan(id: string): Promise<void> {
+  const loans = await getLoans();
+  await setItem(KEYS.LOANS, loans.filter(l => l.id !== id));
+}
+
+export async function getFixedExpenses(): Promise<FixedExpense[]> {
+  return getItem<FixedExpense[]>(KEYS.FIXED_EXPENSES, []);
+}
+
+export async function addFixedExpense(expense: Omit<FixedExpense, 'id' | 'createdAt'>): Promise<FixedExpense> {
+  const expenses = await getFixedExpenses();
+  const newExpense: FixedExpense = {
+    ...expense,
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+  };
+  expenses.unshift(newExpense);
+  await setItem(KEYS.FIXED_EXPENSES, expenses);
+  await addActivity({ type: 'fixed_added', description: `Added fixed expense: ${expense.name}`, amount: expense.amount });
+  return newExpense;
+}
+
+export async function deleteFixedExpense(id: string): Promise<void> {
+  const expenses = await getFixedExpenses();
+  await setItem(KEYS.FIXED_EXPENSES, expenses.filter(e => e.id !== id));
+  await addActivity({ type: 'fixed_deleted', description: 'Deleted fixed expense' });
 }
 
 export async function getBudgetHistory(): Promise<BudgetHistory[]> {
@@ -173,7 +232,7 @@ export async function setShoppingList(list: string[]): Promise<void> {
 }
 
 export async function exportAllData(): Promise<string> {
-  const [expenses, profile, savingsGoals, savedCards, activityLog, budgetHistory, shoppingList] = await Promise.all([
+  const [expenses, profile, savingsGoals, savedCards, activityLog, budgetHistory, shoppingList, loans, fixedExpenses] = await Promise.all([
     getExpenses(),
     getUserProfile(),
     getSavingsGoals(),
@@ -181,10 +240,12 @@ export async function exportAllData(): Promise<string> {
     getActivityLog(),
     getBudgetHistory(),
     getShoppingList(),
+    getLoans(),
+    getFixedExpenses(),
   ]);
 
   const data = {
-    version: 1,
+    version: 2,
     exportDate: new Date().toISOString(),
     appName: 'ExpenseDaddy',
     expenses,
@@ -194,6 +255,8 @@ export async function exportAllData(): Promise<string> {
     activityLog,
     budgetHistory,
     shoppingList,
+    loans,
+    fixedExpenses,
   };
 
   return JSON.stringify(data, null, 2);
@@ -215,6 +278,8 @@ export async function importAllData(jsonString: string): Promise<void> {
   if (data.activityLog) promises.push(setItem(KEYS.ACTIVITY_LOG, data.activityLog));
   if (data.budgetHistory) promises.push(setItem(KEYS.BUDGET_HISTORY, data.budgetHistory));
   if (data.shoppingList) promises.push(setItem(KEYS.SHOPPING_LIST, data.shoppingList));
+  if (data.loans) promises.push(setItem(KEYS.LOANS, data.loans));
+  if (data.fixedExpenses) promises.push(setItem(KEYS.FIXED_EXPENSES, data.fixedExpenses));
 
   await Promise.all(promises);
 }

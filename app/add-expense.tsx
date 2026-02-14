@@ -6,12 +6,19 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { useBudget } from '@/lib/BudgetContext';
-import { CATEGORIES } from '@/lib/types';
+import { CATEGORIES, FIXED_CATEGORIES } from '@/lib/types';
+import type { ExpenseType } from '@/lib/types';
 import { getCategoryColor } from '@/lib/helpers';
+
+const EXPENSE_TYPES: { key: ExpenseType; label: string; icon: string; desc: string }[] = [
+  { key: 'daily', label: 'Daily', icon: 'today-outline', desc: 'Regular expenses (affects budget)' },
+  { key: 'fixed', label: 'Fixed', icon: 'calendar-outline', desc: 'Bills, rent, subscriptions' },
+  { key: 'loan', label: 'Loan', icon: 'wallet-outline', desc: 'Track borrowed money' },
+];
 
 export default function AddExpenseScreen() {
   const insets = useSafeAreaInsets();
-  const { addExpense, profile } = useBudget();
+  const { addExpense, addFixedExpense, addLoan, profile } = useBudget();
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Food');
@@ -21,6 +28,8 @@ export default function AddExpenseScreen() {
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringType, setRecurringType] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
   const [saving, setSaving] = useState(false);
+  const [expenseType, setExpenseType] = useState<ExpenseType>('daily');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const webTopInset = Platform.OS === 'web' ? 67 : 0;
 
   const handleAddTag = () => {
@@ -42,16 +51,34 @@ export default function AddExpenseScreen() {
 
     setSaving(true);
     try {
-      await addExpense({
-        name: name.trim(),
-        amount: amountNum,
-        category,
-        tags,
-        notes: notes.trim(),
-        date: new Date().toISOString(),
-        isRecurring,
-        recurringType: isRecurring ? recurringType : undefined,
-      });
+      if (expenseType === 'loan') {
+        await addLoan({
+          name: name.trim(),
+          amount: amountNum,
+          notes: notes.trim(),
+          date: selectedDate + 'T' + new Date().toISOString().split('T')[1],
+        });
+      } else if (expenseType === 'fixed') {
+        await addFixedExpense({
+          name: name.trim(),
+          amount: amountNum,
+          category,
+          notes: notes.trim(),
+          date: selectedDate + 'T' + new Date().toISOString().split('T')[1],
+        });
+      } else {
+        await addExpense({
+          name: name.trim(),
+          amount: amountNum,
+          category,
+          tags,
+          notes: notes.trim(),
+          date: new Date().toISOString(),
+          isRecurring,
+          recurringType: isRecurring ? recurringType : undefined,
+          expenseType: 'daily',
+        });
+      }
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -62,6 +89,7 @@ export default function AddExpenseScreen() {
   };
 
   const isValid = name.trim().length > 0 && amount.trim().length > 0 && parseFloat(amount) > 0;
+  const activeCategories = expenseType === 'fixed' ? FIXED_CATEGORIES : CATEGORIES;
 
   return (
     <View style={styles.container}>
@@ -80,6 +108,39 @@ export default function AddExpenseScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View style={styles.typeSelector}>
+          {EXPENSE_TYPES.map(type => (
+            <Pressable
+              key={type.key}
+              onPress={() => {
+                setExpenseType(type.key);
+                if (type.key === 'fixed') setCategory('Rent');
+                else if (type.key === 'daily') setCategory('Food');
+                if (Platform.OS !== 'web') Haptics.selectionAsync();
+              }}
+              style={[
+                styles.typeOption,
+                expenseType === type.key && styles.typeOptionActive,
+              ]}
+            >
+              <Ionicons
+                name={type.icon as any}
+                size={18}
+                color={expenseType === type.key ? '#000' : Colors.dark.textSecondary}
+              />
+              <Text style={[
+                styles.typeLabel,
+                expenseType === type.key && styles.typeLabelActive,
+              ]}>
+                {type.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.typeDesc}>
+          {EXPENSE_TYPES.find(t => t.key === expenseType)?.desc}
+        </Text>
+
         <View style={styles.amountSection}>
           <Text style={styles.amountLabel}>Amount</Text>
           <View style={styles.amountRow}>
@@ -102,60 +163,77 @@ export default function AddExpenseScreen() {
             style={styles.input}
             value={name}
             onChangeText={setName}
-            placeholder="e.g., Groceries, Coffee..."
+            placeholder={expenseType === 'loan' ? 'e.g., Borrowed from Ali...' : 'e.g., Groceries, Coffee...'}
             placeholderTextColor={Colors.dark.textTertiary}
           />
         </View>
 
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Category</Text>
-          <View style={styles.categoryGrid}>
-            {CATEGORIES.map(cat => (
-              <Pressable
-                key={cat.name}
-                onPress={() => {
-                  setCategory(cat.name);
-                  if (Platform.OS !== 'web') Haptics.selectionAsync();
-                }}
-                style={[
-                  styles.categoryOption,
-                  category === cat.name && { borderColor: getCategoryColor(cat.name), backgroundColor: getCategoryColor(cat.name) + '15' },
-                ]}
-              >
-                <Ionicons name={cat.icon as any} size={18} color={category === cat.name ? getCategoryColor(cat.name) : Colors.dark.textSecondary} />
-                <Text style={[styles.categoryName, category === cat.name && { color: getCategoryColor(cat.name) }]}>{cat.name}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.field}>
-          <Text style={styles.fieldLabel}>Tags</Text>
-          <View style={styles.tagInputRow}>
+        {expenseType !== 'daily' && (
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Date</Text>
             <TextInput
-              style={[styles.input, { flex: 1 }]}
-              value={tagInput}
-              onChangeText={setTagInput}
-              placeholder="Add tag..."
+              style={styles.input}
+              value={selectedDate}
+              onChangeText={setSelectedDate}
+              placeholder="YYYY-MM-DD"
               placeholderTextColor={Colors.dark.textTertiary}
-              onSubmitEditing={handleAddTag}
-              returnKeyType="done"
             />
-            <Pressable onPress={handleAddTag} style={styles.tagAddBtn}>
-              <Ionicons name="add" size={20} color={Colors.dark.text} />
-            </Pressable>
           </View>
-          {tags.length > 0 && (
-            <View style={styles.tagsRow}>
-              {tags.map(tag => (
-                <Pressable key={tag} onPress={() => handleRemoveTag(tag)} style={styles.tag}>
-                  <Text style={styles.tagText}>{tag}</Text>
-                  <Ionicons name="close" size={12} color={Colors.dark.textTertiary} />
+        )}
+
+        {expenseType !== 'loan' && (
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Category</Text>
+            <View style={styles.categoryGrid}>
+              {activeCategories.map(cat => (
+                <Pressable
+                  key={cat.name}
+                  onPress={() => {
+                    setCategory(cat.name);
+                    if (Platform.OS !== 'web') Haptics.selectionAsync();
+                  }}
+                  style={[
+                    styles.categoryOption,
+                    category === cat.name && { borderColor: getCategoryColor(cat.name), backgroundColor: getCategoryColor(cat.name) + '15' },
+                  ]}
+                >
+                  <Ionicons name={cat.icon as any} size={18} color={category === cat.name ? getCategoryColor(cat.name) : Colors.dark.textSecondary} />
+                  <Text style={[styles.categoryName, category === cat.name && { color: getCategoryColor(cat.name) }]}>{cat.name}</Text>
                 </Pressable>
               ))}
             </View>
-          )}
-        </View>
+          </View>
+        )}
+
+        {expenseType === 'daily' && (
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Tags</Text>
+            <View style={styles.tagInputRow}>
+              <TextInput
+                style={[styles.input, { flex: 1 }]}
+                value={tagInput}
+                onChangeText={setTagInput}
+                placeholder="Add tag..."
+                placeholderTextColor={Colors.dark.textTertiary}
+                onSubmitEditing={handleAddTag}
+                returnKeyType="done"
+              />
+              <Pressable onPress={handleAddTag} style={styles.tagAddBtn}>
+                <Ionicons name="add" size={20} color={Colors.dark.text} />
+              </Pressable>
+            </View>
+            {tags.length > 0 && (
+              <View style={styles.tagsRow}>
+                {tags.map(tag => (
+                  <Pressable key={tag} onPress={() => handleRemoveTag(tag)} style={styles.tag}>
+                    <Text style={styles.tagText}>{tag}</Text>
+                    <Ionicons name="close" size={12} color={Colors.dark.textTertiary} />
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         <View style={styles.field}>
           <Text style={styles.fieldLabel}>Notes</Text>
@@ -170,33 +248,37 @@ export default function AddExpenseScreen() {
           />
         </View>
 
-        <View style={styles.switchRow}>
-          <View style={styles.switchLeft}>
-            <Ionicons name="repeat-outline" size={20} color={Colors.dark.textSecondary} />
-            <Text style={styles.switchLabel}>Recurring Expense</Text>
-          </View>
-          <Switch
-            value={isRecurring}
-            onValueChange={setIsRecurring}
-            trackColor={{ false: Colors.dark.surfaceHighlight, true: Colors.dark.success + '50' }}
-            thumbColor={isRecurring ? Colors.dark.success : Colors.dark.textTertiary}
-          />
-        </View>
+        {expenseType === 'daily' && (
+          <>
+            <View style={styles.switchRow}>
+              <View style={styles.switchLeft}>
+                <Ionicons name="repeat-outline" size={20} color={Colors.dark.textSecondary} />
+                <Text style={styles.switchLabel}>Recurring Expense</Text>
+              </View>
+              <Switch
+                value={isRecurring}
+                onValueChange={setIsRecurring}
+                trackColor={{ false: Colors.dark.surfaceHighlight, true: Colors.dark.success + '50' }}
+                thumbColor={isRecurring ? Colors.dark.success : Colors.dark.textTertiary}
+              />
+            </View>
 
-        {isRecurring && (
-          <View style={styles.recurringOptions}>
-            {(['daily', 'weekly', 'monthly'] as const).map(type => (
-              <Pressable
-                key={type}
-                onPress={() => setRecurringType(type)}
-                style={[styles.recurringOption, recurringType === type && styles.recurringOptionActive]}
-              >
-                <Text style={[styles.recurringOptionText, recurringType === type && styles.recurringOptionTextActive]}>
-                  {type.charAt(0).toUpperCase() + type.slice(1)}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+            {isRecurring && (
+              <View style={styles.recurringOptions}>
+                {(['daily', 'weekly', 'monthly'] as const).map(type => (
+                  <Pressable
+                    key={type}
+                    onPress={() => setRecurringType(type)}
+                    style={[styles.recurringOption, recurringType === type && styles.recurringOptionActive]}
+                  >
+                    <Text style={[styles.recurringOptionText, recurringType === type && styles.recurringOptionTextActive]}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </>
         )}
 
         <View style={{ height: 40 }} />
@@ -227,6 +309,42 @@ const styles = StyleSheet.create({
   content: {
     padding: 20,
     paddingBottom: 40,
+  },
+  typeSelector: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 6,
+  },
+  typeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: Colors.dark.surface,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    gap: 6,
+  },
+  typeOptionActive: {
+    backgroundColor: Colors.dark.text,
+    borderColor: Colors.dark.text,
+  },
+  typeLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: Colors.dark.textSecondary,
+  },
+  typeLabelActive: {
+    color: '#000',
+  },
+  typeDesc: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: Colors.dark.textTertiary,
+    textAlign: 'center',
+    marginBottom: 16,
   },
   amountSection: {
     alignItems: 'center',

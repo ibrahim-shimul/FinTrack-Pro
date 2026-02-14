@@ -1,3 +1,5 @@
+export type ExpenseType = 'daily' | 'fixed' | 'loan';
+
 export interface Expense {
   id: string;
   name: string;
@@ -9,6 +11,28 @@ export interface Expense {
   createdAt: string;
   isRecurring: boolean;
   recurringType?: 'daily' | 'weekly' | 'monthly';
+  expenseType: ExpenseType;
+}
+
+export interface LoanEntry {
+  id: string;
+  name: string;
+  amount: number;
+  notes: string;
+  date: string;
+  createdAt: string;
+  isPaid: boolean;
+  paidDate?: string;
+}
+
+export interface FixedExpense {
+  id: string;
+  name: string;
+  amount: number;
+  category: string;
+  notes: string;
+  date: string;
+  createdAt: string;
 }
 
 export interface BudgetHistory {
@@ -36,7 +60,7 @@ export interface SavedCard {
 
 export interface ActivityItem {
   id: string;
-  type: 'expense_added' | 'expense_edited' | 'expense_deleted' | 'budget_updated' | 'card_added' | 'card_deleted' | 'goal_added' | 'goal_updated';
+  type: 'expense_added' | 'expense_edited' | 'expense_deleted' | 'budget_updated' | 'card_added' | 'card_deleted' | 'goal_added' | 'goal_updated' | 'loan_added' | 'loan_updated' | 'fixed_added' | 'fixed_deleted';
   description: string;
   date: string;
   amount?: number;
@@ -59,6 +83,16 @@ export const CATEGORIES = [
   { name: 'Utilities', icon: 'flash-outline' as const, color: '#98D8C8' },
   { name: 'Education', icon: 'book-outline' as const, color: '#F7DC6F' },
   { name: 'Subscriptions', icon: 'card-outline' as const, color: '#BB8FCE' },
+  { name: 'Other', icon: 'ellipsis-horizontal-outline' as const, color: '#AEB6BF' },
+];
+
+export const FIXED_CATEGORIES = [
+  { name: 'Rent', icon: 'home-outline' as const, color: '#DDA0DD' },
+  { name: 'Utilities', icon: 'flash-outline' as const, color: '#98D8C8' },
+  { name: 'Subscriptions', icon: 'card-outline' as const, color: '#BB8FCE' },
+  { name: 'Insurance', icon: 'shield-outline' as const, color: '#4ECDC4' },
+  { name: 'Internet', icon: 'wifi-outline' as const, color: '#45B7D1' },
+  { name: 'Phone', icon: 'call-outline' as const, color: '#96CEB4' },
   { name: 'Other', icon: 'ellipsis-horizontal-outline' as const, color: '#AEB6BF' },
 ];
 
