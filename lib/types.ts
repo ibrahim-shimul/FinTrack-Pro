@@ -62,4 +62,4 @@ export const CATEGORIES = [
   { name: 'Other', icon: 'ellipsis-horizontal-outline' as const, color: '#AEB6BF' },
 ];
 
-export const CURRENCY_OPTIONS = ['$', '€', '£', '¥', '₹', '₿'];
+export const CURRENCY_OPTIONS = ['৳', '$', '€', '£', '¥', '₹', '₿'];

@@ -147,7 +147,7 @@ export async function addActivity(item: Omit<ActivityItem, 'id' | 'date'>): Prom
 export async function getUserProfile(): Promise<UserProfile> {
   return getItem<UserProfile>(KEYS.USER_PROFILE, {
     name: 'User',
-    currency: '$',
+    currency: '৳',
     monthlyBudget: 0,
     dailyBudgetTarget: 0,
   });

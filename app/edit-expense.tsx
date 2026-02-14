@@ -12,7 +12,7 @@ import { getCategoryColor } from '@/lib/helpers';
 export default function EditExpenseScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { expenses, updateExpense, deleteExpense } = useBudget();
+  const { expenses, updateExpense, deleteExpense, profile } = useBudget();
   const expense = expenses.find(e => e.id === id);
   const webTopInset = Platform.OS === 'web' ? 67 : 0;
 
@@ -90,7 +90,7 @@ export default function EditExpenseScreen() {
         <View style={styles.amountSection}>
           <Text style={styles.amountLabel}>Amount</Text>
           <View style={styles.amountRow}>
-            <Text style={styles.currencySign}>$</Text>
+            <Text style={styles.currencySign}>{profile.currency}</Text>
             <TextInput
               style={styles.amountInput}
               value={amount}

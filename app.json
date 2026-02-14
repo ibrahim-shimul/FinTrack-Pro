@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "BudgetFlow",
-    "slug": "budget-flow",
+    "name": "Expense Daddy",
+    "slug": "expense-daddy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "budgetflow",
+    "scheme": "expensedaddy",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "splash": {
@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.budgetflow"
+      "bundleIdentifier": "com.expensedaddy"
     },
     "android": {
-      "package": "com.budgetflow",
+      "package": "com.expensedaddy",
       "adaptiveIcon": {
         "backgroundColor": "#111111",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

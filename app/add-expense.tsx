@@ -11,7 +11,7 @@ import { getCategoryColor } from '@/lib/helpers';
 
 export default function AddExpenseScreen() {
   const insets = useSafeAreaInsets();
-  const { addExpense } = useBudget();
+  const { addExpense, profile } = useBudget();
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Food');
@@ -83,7 +83,7 @@ export default function AddExpenseScreen() {
         <View style={styles.amountSection}>
           <Text style={styles.amountLabel}>Amount</Text>
           <View style={styles.amountRow}>
-            <Text style={styles.currencySign}>$</Text>
+            <Text style={styles.currencySign}>{profile.currency}</Text>
             <TextInput
               style={styles.amountInput}
               value={amount}
