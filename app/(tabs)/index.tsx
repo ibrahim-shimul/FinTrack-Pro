@@ -239,6 +239,7 @@ export default function HomeScreen() {
       </ScrollView>
 
       <Pressable
+        testID="fab-add-expense"
         style={({ pressed }) => [styles.fab, pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] }]}
         onPress={() => router.push('/add-expense')}
       >
