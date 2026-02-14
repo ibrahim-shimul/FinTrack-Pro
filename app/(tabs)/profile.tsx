@@ -5,18 +5,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Colors from '@/constants/colors';
 import { useBudget } from '@/lib/BudgetContext';
+import { useAuth } from '@/lib/AuthContext';
 import { formatCurrency, formatDate, formatTime } from '@/lib/helpers';
 import { CURRENCY_OPTIONS } from '@/lib/types';
 
-function SettingsRow({ icon, label, value, onPress }: { icon: string; label: string; value?: string; onPress?: () => void }) {
+function SettingsRow({ icon, label, value, onPress, danger }: { icon: string; label: string; value?: string; onPress?: () => void; danger?: boolean }) {
   return (
     <Pressable
       style={({ pressed }) => [styles.settingsRow, pressed && onPress && { backgroundColor: Colors.dark.surfaceElevated }]}
       onPress={onPress}
     >
       <View style={styles.settingsLeft}>
-        <Ionicons name={icon as any} size={20} color={Colors.dark.textSecondary} />
-        <Text style={styles.settingsLabel}>{label}</Text>
+        <Ionicons name={icon as any} size={20} color={danger ? Colors.dark.danger : Colors.dark.textSecondary} />
+        <Text style={[styles.settingsLabel, danger && { color: Colors.dark.danger }]}>{label}</Text>
       </View>
       <View style={styles.settingsRight}>
         {value && <Text style={styles.settingsValue}>{value}</Text>}
@@ -26,7 +27,7 @@ function SettingsRow({ icon, label, value, onPress }: { icon: string; label: str
   );
 }
 
-function ActivityLogItem({ item }: { item: any }) {
+function ActivityLogItem({ item, currency }: { item: any; currency: string }) {
   const getIcon = () => {
     switch (item.type) {
       case 'expense_added': return 'add-circle-outline';
@@ -51,7 +52,7 @@ function ActivityLogItem({ item }: { item: any }) {
         <Text style={styles.activityDate}>{formatDate(item.date)} {formatTime(item.date)}</Text>
       </View>
       {item.amount !== undefined && (
-        <Text style={styles.activityAmount}>{formatCurrency(item.amount, '$')}</Text>
+        <Text style={styles.activityAmount}>{formatCurrency(item.amount, currency)}</Text>
       )}
     </View>
   );
@@ -60,9 +61,16 @@ function ActivityLogItem({ item }: { item: any }) {
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { profile, updateProfile, activityLog, savingsGoals, expenses } = useBudget();
+  const { user, logout, changePassword } = useAuth();
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(profile.name);
   const [showActivity, setShowActivity] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [currentPwd, setCurrentPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [pwdError, setPwdError] = useState('');
+  const [pwdSuccess, setPwdSuccess] = useState('');
+  const [pwdLoading, setPwdLoading] = useState(false);
   const webTopInset = Platform.OS === 'web' ? 67 : 0;
 
   const handleSaveName = async () => {
@@ -78,6 +86,45 @@ export default function ProfileScreen() {
     updateProfile({ currency: CURRENCY_OPTIONS[nextIndex] });
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (e) {}
+  };
+
+  const handlePasswordChange = async () => {
+    if (!currentPwd || !newPwd) {
+      setPwdError('Please fill in both fields');
+      return;
+    }
+    if (newPwd.length < 4) {
+      setPwdError('New password must be at least 4 characters');
+      return;
+    }
+    setPwdError('');
+    setPwdSuccess('');
+    setPwdLoading(true);
+    try {
+      await changePassword(currentPwd, newPwd);
+      setPwdSuccess('Password updated successfully');
+      setCurrentPwd('');
+      setNewPwd('');
+      setTimeout(() => {
+        setShowPasswordChange(false);
+        setPwdSuccess('');
+      }, 1500);
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.includes('401')) {
+        setPwdError('Current password is incorrect');
+      } else {
+        setPwdError('Password change failed');
+      }
+    } finally {
+      setPwdLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -88,7 +135,9 @@ export default function ProfileScreen() {
 
         <View style={styles.profileCard}>
           <View style={styles.avatarContainer}>
-            <Ionicons name="person" size={32} color={Colors.dark.textSecondary} />
+            <Text style={styles.avatarText}>
+              {(profile.name || 'U')[0].toUpperCase()}
+            </Text>
           </View>
           {editingName ? (
             <View style={styles.nameEditRow}>
@@ -108,6 +157,9 @@ export default function ProfileScreen() {
             <Pressable onPress={() => { setNameInput(profile.name); setEditingName(true); }}>
               <Text style={styles.profileName}>{profile.name}</Text>
             </Pressable>
+          )}
+          {user && (
+            <Text style={styles.usernameLabel}>@{user.username}</Text>
           )}
           <View style={styles.profileStats}>
             <View style={styles.profileStat}>
@@ -158,6 +210,67 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <View style={styles.settingsGroup}>
+            <SettingsRow
+              icon="key-outline"
+              label="Change Password"
+              onPress={() => setShowPasswordChange(!showPasswordChange)}
+            />
+            <SettingsRow
+              icon="log-out-outline"
+              label="Sign Out"
+              onPress={handleLogout}
+              danger
+            />
+          </View>
+        </View>
+
+        {showPasswordChange && (
+          <View style={styles.passwordSection}>
+            {pwdError ? (
+              <View style={styles.pwdErrorBox}>
+                <Ionicons name="alert-circle" size={14} color={Colors.dark.danger} />
+                <Text style={styles.pwdErrorText}>{pwdError}</Text>
+              </View>
+            ) : null}
+            {pwdSuccess ? (
+              <View style={styles.pwdSuccessBox}>
+                <Ionicons name="checkmark-circle" size={14} color={Colors.dark.success} />
+                <Text style={styles.pwdSuccessText}>{pwdSuccess}</Text>
+              </View>
+            ) : null}
+            <View style={styles.pwdInputContainer}>
+              <TextInput
+                style={styles.pwdInput}
+                placeholder="Current password"
+                placeholderTextColor={Colors.dark.textTertiary}
+                value={currentPwd}
+                onChangeText={setCurrentPwd}
+                secureTextEntry
+              />
+            </View>
+            <View style={styles.pwdInputContainer}>
+              <TextInput
+                style={styles.pwdInput}
+                placeholder="New password"
+                placeholderTextColor={Colors.dark.textTertiary}
+                value={newPwd}
+                onChangeText={setNewPwd}
+                secureTextEntry
+              />
+            </View>
+            <Pressable
+              style={({ pressed }) => [styles.pwdButton, pressed && { opacity: 0.85 }]}
+              onPress={handlePasswordChange}
+              disabled={pwdLoading}
+            >
+              <Text style={styles.pwdButtonText}>{pwdLoading ? 'Updating...' : 'Update Password'}</Text>
+            </Pressable>
+          </View>
+        )}
+
+        <View style={styles.section}>
           <Pressable onPress={() => setShowActivity(!showActivity)} style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Activity Log</Text>
             <Ionicons name={showActivity ? 'chevron-up' : 'chevron-down'} size={20} color={Colors.dark.textSecondary} />
@@ -169,7 +282,7 @@ export default function ProfileScreen() {
               </View>
             ) : (
               activityLog.slice(0, 20).map(item => (
-                <ActivityLogItem key={item.id} item={item} />
+                <ActivityLogItem key={item.id} item={item} currency={profile.currency} />
               ))
             )
           )}
@@ -209,10 +322,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  avatarText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 28,
+    color: Colors.dark.text,
+  },
   profileName: {
     fontFamily: 'Inter_700Bold',
     fontSize: 22,
     color: Colors.dark.text,
+    marginBottom: 4,
+  },
+  usernameLabel: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    color: Colors.dark.textTertiary,
     marginBottom: 16,
   },
   nameEditRow: {
@@ -307,6 +431,67 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     color: Colors.dark.textSecondary,
+  },
+  passwordSection: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  pwdInputContainer: {
+    backgroundColor: Colors.dark.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+    height: 48,
+  },
+  pwdInput: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 15,
+    color: Colors.dark.text,
+    height: 48,
+    paddingHorizontal: 14,
+  },
+  pwdButton: {
+    backgroundColor: Colors.dark.surfaceElevated,
+    borderRadius: 14,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.dark.border,
+  },
+  pwdButtonText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    color: Colors.dark.text,
+  },
+  pwdErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.dark.danger + '15',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  pwdErrorText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: Colors.dark.danger,
+  },
+  pwdSuccessBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.dark.success + '15',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  pwdSuccessText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
+    color: Colors.dark.success,
   },
   activityItem: {
     flexDirection: 'row',
