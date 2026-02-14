@@ -13,14 +13,19 @@ A local-first personal budget and expenses tracker mobile app built with Expo (R
 - **Backup**: Export all data as JSON file, Import to restore from backup
 
 ## Key Features
-- Dashboard with budget ring, daily/monthly spending, top categories
+- Three expense types:
+  - **Daily**: Regular expenses that count toward monthly/daily budget
+  - **Fixed**: Bills, rent, subscriptions tracked separately (don't affect budget)
+  - **Loan**: Borrowed money record-keeping with paid/unpaid status
+- Dashboard with budget ring, daily/monthly spending, top categories, fixed totals, outstanding loans
 - Full expense CRUD with categories, tags, notes, recurring expenses
-- Budget management with monthly/daily targets and history
-- Insights with daily/monthly summaries, category breakdown, calendar heatmap
+- Budget management with monthly/daily targets and history (only daily expenses count)
+- Insights with daily/monthly summaries, category breakdown, calendar heatmap (daily expenses only)
+- Expense list with tabbed interface (Daily/Fixed/Loans) and search/filter
 - Saved card management
 - Savings goals tracker
 - Activity log
-- Profile with settings, data export/import
+- Profile with settings, data export/import (uses expo-file-system + expo-sharing on native)
 - No authentication needed - fully local app
 
 ## Project Structure
