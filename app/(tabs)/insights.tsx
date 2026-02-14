@@ -122,6 +122,8 @@ export default function InsightsScreen() {
       .map(([name, amount]) => ({ name, amount }));
   }, [monthExpenses]);
 
+  const dailyOnly = useMemo(() => expenses.filter(e => (e.expenseType || 'daily') === 'daily'), [expenses]);
+
   const weeklyData = useMemo(() => {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const today = new Date();
@@ -133,12 +135,12 @@ export default function InsightsScreen() {
       const date = new Date(monday);
       date.setDate(monday.getDate() + i);
       const dateStr = date.toISOString().split('T')[0];
-      const amount = expenses
+      const amount = dailyOnly
         .filter(e => e.date.startsWith(dateStr))
         .reduce((sum, e) => sum + e.amount, 0);
       return { day, amount };
     });
-  }, [expenses]);
+  }, [dailyOnly]);
 
   const monthName = new Date(calYear, calMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -267,7 +269,7 @@ export default function InsightsScreen() {
                 <Ionicons name="chevron-forward" size={24} color={Colors.dark.textSecondary} />
               </Pressable>
             </View>
-            <CalendarView expenses={expenses} year={calYear} month={calMonth} currency={profile.currency} />
+            <CalendarView expenses={dailyOnly} year={calYear} month={calMonth} currency={profile.currency} />
             <View style={styles.calLegend}>
               <View style={styles.calLegendItem}>
                 <View style={[styles.calLegendDot, { backgroundColor: Colors.dark.expense, opacity: 0.3 }]} />
